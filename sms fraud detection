@@ -1,66 +1,225 @@
-import numpy as np
-import pandas as pd
-import seaborn as sn
-import matplotlib.pyplot as plt
-from sklearn.naive_bayes import MultinomialNB
+import pandas as pd import seaborn as sns import matplotlib.pyplot as plt %matplotlib inline
+import nltk from nltk import word_tokenize import string, re from nltk.corpus import stopwords nltk.download('stopwords') nltk.download('punkt') from nltk.stem import LancasterStemmer from nltk.stem import WordNetLemmatizer from nltk.stem import PorterStemmer nltk.download('wordnet')
+[nltk_data] Downloading package stopwords to /root/nltk_data...
+[nltk_data]   Unzipping corpora/stopwords.zip.
+[nltk_data] Downloading package punkt to /root/nltk_data...
+[nltk_data]   Unzipping tokenizers/punkt.zip.
+[nltk_data] Downloading package wordnet to /root/nltk_data...
+True
+# 1. Data Cleaning # 2. EDA # 3. Text Preprocessing # 4. Model Building # 5. Evaluation # 6. Improvements # 7. Websites # 8. Deployments
+!unzip "/content/drive/MyDrive/Data-Science Edureka/Data Science New Project /Email Classification/SMS Spam/sms+spam+collection.zip"
+Archive:  /content/drive/MyDrive/Data-Science Edureka/Data Science New Project /Email Classification/SMS Spam/sms+spam+collection.zip
+  inflating: SMSSpamCollection       
+  inflating: readme                  
+1. Data Cleaning
+data = pd.read_csv("/content/SMSSpamCollection", sep = "\t", header = None) data.rename(columns = {0:'Category', 1:"Email Text"}, inplace = True) # rename columns name data
+Category	Email Text
+0	ham	Go until jurong point, crazy.. Available only ...
+1	ham	Ok lar... Joking wif u oni...
+2	spam	Free entry in 2 a wkly comp to win FA Cup fina...
+3	ham	U dun say so early hor... U c already then say...
+4	ham	Nah I don't think he goes to usf, he lives aro...
+...	...	...
+5567	spam	This is the 2nd time we have tried 2 contact u...
+5568	ham	Will ü b going to esplanade fr home?
+5569	ham	Pity, * was in mood for that. So...any other s...
+5570	ham	The guy did some bitching but I acted like i'd...
+5571	ham	Rofl. Its true to its name
+5572 rows × 2 columns
+
+data.isnull().sum()
+Category      0
+Email Text    0
+dtype: int64
+data.duplicated().sum()
+403
+data = data.drop_duplicates(keep = 'first')
+data.duplicated().sum()
+0
+data = data.reset_index(drop = True) data
+Category	Email Text
+0	ham	Go until jurong point, crazy.. Available only ...
+1	ham	Ok lar... Joking wif u oni...
+2	spam	Free entry in 2 a wkly comp to win FA Cup fina...
+3	ham	U dun say so early hor... U c already then say...
+4	ham	Nah I don't think he goes to usf, he lives aro...
+...	...	...
+5164	spam	This is the 2nd time we have tried 2 contact u...
+5165	ham	Will ü b going to esplanade fr home?
+5166	ham	Pity, * was in mood for that. So...any other s...
+5167	ham	The guy did some bitching but I acted like i'd...
+5168	ham	Rofl. Its true to its name
+5169 rows × 2 columns
+
+data.shape
+(5169, 2)
+2. EDA
+print(f"Email Not Spam : {round(data['Category'].value_counts()[0] / len(data) * 100, 2)} %") print(f"Spam Email : {round(data['Category'].value_counts()[1] / len(data) * 100 , 2)} %")
+Email Not Spam : 87.37 %
+Spam Email : 12.63 %
+plt.pie(data['Category'].value_counts(),labels = ['ham', 'spam'], autopct = "%.2f%%"); plt.legend();
+
+data['num_characters'] = data['Email Text'].apply(len) data.head()
+Category	Email Text	num_characters
+0	ham	Go until jurong point, crazy.. Available only ...	111
+1	ham	Ok lar... Joking wif u oni...	29
+2	spam	Free entry in 2 a wkly comp to win FA Cup fina...	155
+3	ham	U dun say so early hor... U c already then say...	49
+4	ham	Nah I don't think he goes to usf, he lives aro...	61
+data['num_words'] = data['Email Text'].apply(lambda x : len(nltk.word_tokenize(x))) data.head()
+Category	Email Text	num_characters	num_words
+0	ham	Go until jurong point, crazy.. Available only ...	111	24
+1	ham	Ok lar... Joking wif u oni...	29	8
+2	spam	Free entry in 2 a wkly comp to win FA Cup fina...	155	37
+3	ham	U dun say so early hor... U c already then say...	49	13
+4	ham	Nah I don't think he goes to usf, he lives aro...	61	15
+data['num_sent'] = data['Email Text'].apply(lambda x : len(nltk.sent_tokenize(x))) data.head()
+Category	Email Text	num_characters	num_words	num_sent
+0	ham	Go until jurong point, crazy.. Available only ...	111	24	2
+1	ham	Ok lar... Joking wif u oni...	29	8	2
+2	spam	Free entry in 2 a wkly comp to win FA Cup fina...	155	37	2
+3	ham	U dun say so early hor... U c already then say...	49	13	1
+4	ham	Nah I don't think he goes to usf, he lives aro...	61	15	1
+data.describe()
+num_characters	num_words	num_sent
+count	5169.000000	5169.000000	5169.000000
+mean	79.344554	18.593538	1.974076
+std	58.437457	13.402779	1.458967
+min	2.000000	1.000000	1.000000
+25%	36.000000	9.000000	1.000000
+50%	61.000000	15.000000	1.000000
+75%	119.000000	26.000000	2.000000
+max	910.000000	220.000000	38.000000
+data[data['Category'] == 'ham'].describe()
+num_characters	num_words	num_sent
+count	4516.000000	4516.000000	4516.000000
+mean	70.905890	17.267715	1.827724
+std	56.715046	13.588065	1.394338
+min	2.000000	1.000000	1.000000
+25%	34.000000	8.000000	1.000000
+50%	53.000000	13.000000	1.000000
+75%	91.000000	22.000000	2.000000
+max	910.000000	220.000000	38.000000
+data[data['Category'] == 'spam'].describe()
+num_characters	num_words	num_sent
+count	653.000000	653.000000	653.000000
+mean	137.704441	27.762634	2.986217
+std	29.821348	6.993008	1.494815
+min	13.000000	2.000000	1.000000
+25%	132.000000	25.000000	2.000000
+50%	148.000000	29.000000	3.000000
+75%	157.000000	32.000000	4.000000
+max	223.000000	46.000000	9.000000
+# sns.pairplot(data, hue = ['Category'])
+data.corr()
+<ipython-input-21-c44ded798807>:1: FutureWarning: The default value of numeric_only in DataFrame.corr is deprecated. In a future version, it will default to False. Select only valid columns or specify the value of numeric_only to silence this warning.
+  data.corr()
+num_characters	num_words	num_sent
+num_characters	1.000000	0.966003	0.622580
+num_words	0.966003	1.000000	0.679142
+num_sent	0.622580	0.679142	1.000000
+sns.heatmap(data.corr(), annot = True)
+<ipython-input-22-1f756df288d0>:1: FutureWarning: The default value of numeric_only in DataFrame.corr is deprecated. In a future version, it will default to False. Select only valid columns or specify the value of numeric_only to silence this warning.
+  sns.heatmap(data.corr(), annot = True)
+<Axes: >
+
+3. Data Preprocessing
+Lower Cases
+Tokenization
+Removing Special Character
+Removing stop Words and punctuation
+Stemming
+port_stemmer = PorterStemmer() lan_stemmer = LancasterStemmer() lemmatizer = WordNetLemmatizer()
+# Create a function to generate cleaned data from raw text def clean_text(text): text = word_tokenize(text) # Create tokens text= " ".join(text) # Join tokens text = [char for char in text if char not in string.punctuation] # Remove punctuations text = ''.join(text) # Join the leters text = [char for char in text if char not in re.findall(r"[0-9]", text)] # Remove Numbers text = ''.join(text) # Join the leters text = [word.lower() for word in text.split() if word.lower() not in set(stopwords.words('english'))] # Remove common english words (I, you, we,...) text = ' '.join(text) # Join the leters # text = list(map(lambda x: lan_stemmer.stem(x), text.split())) text = list(map(lambda x: port_stemmer.stem(x), text.split())) # text = list(map(lambda x: lemmatizer.lemmatize(x), text.split())) return " ".join(text) # error word
+data['Clean Email'] = data['Email Text'].apply(clean_text)
+data.columns
+Index(['Category', 'Email Text', 'num_characters', 'num_words', 'num_sent',
+       'Clean Email'],
+      dtype='object')
+data.head(10)
+Category	Email Text	num_characters	num_words	num_sent	Clean Email
+0	ham	Go until jurong point, crazy.. Available only ...	111	24	2	go jurong point crazi avail bugi n great world...
+1	ham	Ok lar... Joking wif u oni...	29	8	2	ok lar joke wif u oni
+2	spam	Free entry in 2 a wkly comp to win FA Cup fina...	155	37	2	free entri wkli comp win fa cup final tkt st m...
+3	ham	U dun say so early hor... U c already then say...	49	13	1	u dun say earli hor u c alreadi say
+4	ham	Nah I don't think he goes to usf, he lives aro...	61	15	1	nah nt think goe usf live around though
+5	spam	FreeMsg Hey there darling it's been 3 week's n...	147	39	4	freemsg hey darl week word back like fun still...
+6	ham	Even my brother is not like to speak with me. ...	77	18	2	even brother like speak treat like aid patent
+7	ham	As per your request 'Melle Melle (Oru Minnamin...	160	31	2	per request mell mell oru minnaminungint nurun...
+8	spam	WINNER!! As a valued network customer you have...	157	32	5	winner valu network custom select receivea £ p...
+9	spam	Had your mobile 11 months or more? U R entitle...	154	31	3	mobil month u r entitl updat latest colour mob...
+from wordcloud import WordCloud wc = WordCloud(width = 2000, height = 1000, min_font_size = 10, background_color = 'Black')
+spam_ = wc.generate(data[data['Category']=='spam']['Clean Email'].str.cat(sep = " ")); plt.figure(figsize = (15,6)) plt.imshow(spam_);
+
+ham_ = wc.generate(data[data['Category']=='ham']['Clean Email'].str.cat(sep = " ")); plt.figure(figsize = (15,6)) plt.imshow(ham_);
+
+spam_word = [] for msg in data[data['Category'] == 'spam']['Clean Email'].tolist(): for word in msg.split(): spam_word.append(word)
+len(spam_word)
+9553
+from collections import Counter # Count frequence of word in text plt.bar(pd.DataFrame(Counter(spam_word).most_common(30))[0], pd.DataFrame(Counter(spam_word).most_common(30))[1]) plt.xticks(rotation = 'vertical');
+
+ham_word = [] for msg in data[data['Category'] == 'ham']['Clean Email'].tolist(): for word in msg.split(): ham_word.append(word)
+len(ham_word)
+36329
+from collections import Counter # Count frequence of word in text plt.bar(pd.DataFrame(Counter(ham_word).most_common(30))[0], pd.DataFrame(Counter(ham_word).most_common(30))[1]) plt.xticks(rotation = 'vertical');
+
+from sklearn.preprocessing import LabelEncoder # Initialize the LabelEncoder encoder = LabelEncoder() # Fit and transform the labels data['target'] = encoder.fit_transform(data['Category'])
+4. Model Building
+from sklearn.feature_extraction.text import CountVectorizer ,TfidfVectorizer cv = CountVectorizer
+# Initialize the TF-IDF vectorizer tf = TfidfVectorizer(max_features = 3000) # Fit and transform the text column X = tf.fit_transform(data['Clean Email']).toarray() X.shape
+(5169, 3000)
+y = data['target'].values
+y
+array([0, 0, 1, ..., 0, 0, 0])
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score,precision_score,f1_score,recall_score,classification_report
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
-
-#reading data
-df=pd.read_csv("/..../enter your path of dataset/...csv")
-
-#making ham=0,spam=1 used as target matrix in label_num column
-df['label_num'] = df.label.map({'ham':0,'spam':1})
-features = df["text"]
-labels=df["label_num"]
-
-#plotting data
-sn.countplot(df["label"])
-print(plt.show())
-
-#spliting training and testing data
-f_train,f_test,l_train,l_test= train_test_split(features,labels,test_size=.1)
-f_train=np.array(f_train)
-f_test=np.array(f_test)
-l_train=np.array(l_train)
-l_test=np.array(l_test)
-
-#inorder to train model we need to convert text to appropriate numerical values using vetorization
-
-vect = CountVectorizer()
-f_train_count = vect.fit_transform(f_train)
-f_test_count= vect.transform(f_test)
-#trans = TfidfTransformer()
-#f_train_trans = trans.fit_transform(f_train_count)
-#f_test_trans = trans.transform(f_test_count)
-
-
-#model training and prediction
-sd = MultinomialNB()
-sd.fit(f_train_count,l_train)
-print("\n\n\033[1;32;40m [+]train score: ",sd.score(f_train_count,l_train))
-print("\n\n[+]test score:  ",sd.score(f_test_count,l_test))
-y_class = sd.predict(f_test_count)
-a= accuracy_score(l_test,y_class)
-d= precision_score(l_test,y_class)
-e= recall_score(l_test,y_class)
-g= f1_score(l_test,y_class)
-print("\n\n[+]accuracy score = " ,a)
-print("\n\n[+]precision score = ",d)
-print("\n\n[+]recall score = ", e)
-print("\n\n[+]f1 score = ", g)
-report = classification_report(y_class,l_test)
-print("\n",report)
-
-
-#testing with data other than in dataset
-print("\n\n[+] lets test with other unique msgs other than the datasets used: ") 
-t=[input("[+]enter a text msg to test : ")]
-t=np.array(t)
-t=vect.transform(t)
-prediction = sd.predict(t)
-if prediction == 0:
-    print("HAAM!")
-else:
-    print("\033[1;31;40m [+]SPAAAM!")
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 2)
+from sklearn.naive_bayes import GaussianNB, MultinomialNB, BernoulliNB from sklearn.metrics import accuracy_score, precision_score, confusion_matrix, recall_score, f1_score, roc_auc_score, mean_squared_error, r2_score, log_loss
+gnb = GaussianNB() mnb = MultinomialNB() bnb = BernoulliNB()
+gnb.fit(X_train, y_train) y_pred1 = gnb.predict(X_test) print(f"Accuracy Score: {accuracy_score(y_test, y_pred1)}") print(confusion_matrix(y_test, y_pred1)) print(f"Precision Score {precision_score(y_test, y_pred1)}")
+Accuracy Score: 0.8607350096711799
+[[788 120]
+ [ 24 102]]
+Precision Score 0.4594594594594595
+mnb.fit(X_train, y_train) y_pred2 = mnb.predict(X_test) print(f"Accuracy Score: {accuracy_score(y_test, y_pred2)}") print(confusion_matrix(y_test, y_pred2)) print(f"Precision Score {precision_score(y_test, y_pred2)}")
+Accuracy Score: 0.9709864603481625
+[[908   0]
+ [ 30  96]]
+Precision Score 1.0
+bnb.fit(X_train, y_train) y_pred3 = bnb.predict(X_test) print(f"Accuracy Score: {accuracy_score(y_test, y_pred3)}") print(confusion_matrix(y_test, y_pred3)) print(f"Precision Score {precision_score(y_test, y_pred3)}")
+Accuracy Score: 0.9796905222437138
+[[906   2]
+ [ 19 107]]
+Precision Score 0.981651376146789
+import pickle pickle.dump(tf, open('vectorizer.pkl', 'wb')) pickle.dump(mnb, open('model.pkl', 'wb')) # tf , mnb
+sms = "“We’re happy to inform you that you’re entitled to a refund for overpayment on your AMEX account. Click on this link [Link] below to claim your refund.”"
+tf_idf = pickle.load(open("/content/vectorizer.pkl", 'rb')) models = pickle.load(open("/content/model.pkl", 'rb'))
+# 1. Preprocess transformed_sms = clean_text(sms) # 2. Vectorize vect_input = tf_idf.transform([transformed_sms]) # 3. Predict result = models.predict(vect_input)[0] # 4. Display if result == 1: print("Spam") else: print("Not Spam")
+Spam
+Multiple Model
+from sklearn.linear_model import LogisticRegression from sklearn.tree import DecisionTreeClassifier from sklearn.ensemble import RandomForestClassifier from sklearn.naive_bayes import GaussianNB from sklearn.neighbors import KNeighborsClassifier from sklearn.svm import SVC
+models = [] models.append(('Logistic Regression', LogisticRegression()) ) models.append((('Decision Tree Classifier', DecisionTreeClassifier()))) models.append(('Random Forest Classifier', RandomForestClassifier())) models.append(('Naive bayes', MultinomialNB())) models.append(('KNeighborsClassifier', KNeighborsClassifier())) models.append(('Support Vector Machine', SVC()))
+models
+[('Logistic Regression', LogisticRegression()),
+ ('Decision Tree Classifier', DecisionTreeClassifier()),
+ ('Random Forest Classifier', RandomForestClassifier()),
+ ('Naive bayes', MultinomialNB()),
+ ('KNeighborsClassifier', KNeighborsClassifier()),
+ ('Support Vector Machine', SVC())]
+Model = [] Accuracy = [] Precision = [] Recall = [] F1 = [] for name, model in models: model.fit(X_train, y_train) y_pred = model.predict(X_test) Model.append(name) Accuracy.append(round(accuracy_score(y_test, y_pred), 4) * 100) Precision.append(round(precision_score(y_test, y_pred), 4) * 100) Recall.append(round(recall_score(y_test, y_pred), 4) * 100) F1.append(round(f1_score(y_test, y_pred), 4) * 100) df = pd.DataFrame({'Model': Model, 'Accuracy':Accuracy, 'Precision':Precision, 'Recall':Recall, 'F1 Score':F1})
+df = df.sort_values(by = 'Precision', ascending = False).reset_index(drop = True) df
+Model	Accuracy	Precision	Recall	F1 Score
+0	Naive bayes	97.10	100.00	76.19	86.49
+1	KNeighborsClassifier	91.88	100.00	33.33	50.00
+2	Support Vector Machine	97.29	99.00	78.57	87.61
+3	Logistic Regression	95.16	97.50	61.90	75.73
+4	Random Forest Classifier	97.20	97.09	79.37	87.34
+5	Decision Tree Classifier	94.78	80.00	76.19	78.05
+df = df.sort_values(by = 'F1 Score', ascending = False).reset_index(drop = True) df
+Model	Accuracy	Precision	Recall	F1 Score
+0	Support Vector Machine	97.29	99.00	78.57	87.61
+1	Random Forest Classifier	97.20	97.09	79.37	87.34
+2	Naive bayes	97.10	100.00	76.19	86.49
+3	Decision Tree Classifier	94.78	80.00	76.19	78.05
+4	Logistic Regression	95.16	97.50	61.90	75.73
+5	KNeighborsClassifier	91.88	100.00	33.33	50.00
+plt.figure(figsize = (15,5)) plt.bar(df['Model'],df['F1 Score']);
